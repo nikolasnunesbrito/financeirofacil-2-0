@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [salary, setSalary] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
@@ -54,10 +56,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
     try {
       if (mode === "cadastro") {
+        const salaryValue = salary.trim() ? Number(salary.replace(",", ".")) : null;
+        if (salary.trim() && (!Number.isFinite(salaryValue) || salaryValue! < 0)) {
+          setFeedback({ tone: "error", text: "Informe um salário válido (apenas números)." });
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name.trim() } },
+          options: { data: { full_name: name.trim(), monthly_salary: salaryValue } },
         });
         if (error) {
           setFeedback({ tone: "error", text: authMessage(error.message) });
@@ -135,17 +142,40 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Senha</Label>
-        <Input
-          id="password"
-          type="password"
-          required
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
+      {mode === "cadastro" && (
+        <div className="space-y-2">
+          <Label htmlFor="salary">Salário mensal (opcional)</Label>
+          <Input
+            id="salary"
+            inputMode="decimal"
+            value={salary}
+            onChange={(e) => setSalary(e.target.value)}
+            placeholder="Ex.: 3500"
+          />
+        </div>
+      )}
 
       <Button type="submit" className="w-full" size="lg" disabled={busy}>
         {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
