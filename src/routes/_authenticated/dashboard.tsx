@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Loader2, LogOut, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { AlertCircle, Banknote, Loader2, LogOut, Pencil, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -47,6 +49,12 @@ function Dashboard() {
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [salaryOpen, setSalaryOpen] = useState(false);
+  const [salaryInput, setSalaryInput] = useState("");
+  const [salaryError, setSalaryError] = useState<string | null>(null);
+  const [salarySaving, setSalarySaving] = useState(false);
+
+  const monthlySalary = (session.data?.user_metadata?.["monthly_salary"] as number | null) ?? null;
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -80,6 +88,30 @@ function Dashboard() {
     setListError(null);
     const message = await remove(target.id);
     if (message) setListError(message);
+  };
+
+  const openSalaryDialog = () => {
+    setSalaryInput(monthlySalary != null ? String(monthlySalary) : "");
+    setSalaryError(null);
+    setSalaryOpen(true);
+  };
+
+  const handleSaveSalary = async () => {
+    const trimmed = salaryInput.trim();
+    const value = trimmed ? Number(trimmed.replace(",", ".")) : null;
+    if (trimmed && (!Number.isFinite(value) || value! < 0)) {
+      setSalaryError("Informe um valor válido (apenas números).");
+      return;
+    }
+    setSalarySaving(true);
+    setSalaryError(null);
+    const { error } = await supabase.auth.updateUser({ data: { monthly_salary: value } });
+    setSalarySaving(false);
+    if (error) {
+      setSalaryError("Não foi possível salvar o salário. Tente novamente.");
+      return;
+    }
+    setSalaryOpen(false);
   };
 
   return (
@@ -128,10 +160,22 @@ function Dashboard() {
           </div>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard label="Saldo atual" value={totals.balance} icon={Wallet} tone="balance" />
               <StatCard label="Total de receitas" value={totals.income} icon={TrendingUp} tone="income" />
               <StatCard label="Total de despesas" value={totals.expense} icon={TrendingDown} tone="expense" />
+              <div className="relative">
+                <StatCard label="Salário mensal" value={monthlySalary ?? 0} icon={Banknote} tone="balance" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={openSalaryDialog}
+                  aria-label="Editar salário mensal"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -176,6 +220,37 @@ function Dashboard() {
             }}
             onSubmit={handleUpdate}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salário mensal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="salary-edit">Valor (R$)</Label>
+            <Input
+              id="salary-edit"
+              inputMode="decimal"
+              value={salaryInput}
+              onChange={(e) => setSalaryInput(e.target.value)}
+              placeholder="Ex.: 3500"
+            />
+            {salaryError && (
+              <p role="alert" className="flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {salaryError}
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSalaryOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveSalary} disabled={salarySaving}>
+              {salarySaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
